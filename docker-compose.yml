@@ -1,13 +1,54 @@
-version: '3.8'
-
 services:
   db:
-    image: mongo:5
-    container_name: pokedex_mongo
-    restart: always
-    ports: 
-      - "27017:27017"
-    environment:
-      MONGO_INITDB_DATABASE: nest-pokemon
+    container_name: mongo-db
+    image: mongo:6.0
     volumes:
-      - ./mongo:/data/db
+      - poke-vol:/data/db
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_DB_NAME}
+    command: ["--auth"]
+    networks:
+      - poke-net
+
+  mongo-express:
+    container_name: mongo-express
+    image: mongo-express:1.0.0-alpha.4
+    depends_on:
+      - db
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_USERNAME}
+      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_PASSWORD}
+      ME_CONFIG_MONGODB_SERVER: db
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: admin123
+    ports:
+      - "8080:8081"
+    restart: always
+    networks:
+      - poke-net
+
+  poke-app:
+    container_name: pokemon-nestjs-app
+    image: klerith/pokemon-nest-app:1.0.0
+    depends_on:
+      - db
+      - mongo-express
+    environment:
+      MONGODB: mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@db:27017/${MONGO_DB_NAME}?authSource=admin
+      DB_NAME: ${MONGO_DB_NAME}
+    ports:
+      - "3000:3000"
+    restart: always
+    networks:
+      - poke-net
+
+volumes:
+  poke-vol:
+    driver: local
+
+networks:
+  poke-net:
+    driver: bridge
